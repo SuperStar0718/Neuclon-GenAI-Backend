@@ -3,6 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const db = require('./database/database');
 const connectDB = require('./config/db');
+const cors = require('cors');
 
 console.log('environment    ', process.env.ENVIRONMENT)
 console.log('PORT    ', process.env.PORT)
@@ -17,6 +18,7 @@ connectDB();
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.static(path.join(__dirname, './client/build')));
 app.use(bodyParser.json());
 app.use((req, res, next) => {

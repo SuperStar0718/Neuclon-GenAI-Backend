@@ -25,7 +25,7 @@ jobs:
         run: |
           npm install
           npm run build --if-present
-          # npm run test --if-present
+          npm run test --if-present
 
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
@@ -59,4 +59,4 @@ jobs:
           app-name: 'neuclon-gen-api'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0B30F82E9B8A4580AB19F71CE9243FF6 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_922B9485685D45E0AC381F8DF455E96B }}

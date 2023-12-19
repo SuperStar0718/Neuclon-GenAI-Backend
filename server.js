@@ -16,7 +16,7 @@ connectDB();
 
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.static(path.join(__dirname, './client/build')));
@@ -44,6 +44,7 @@ app.get('/', (req, res) => {
 // })
 
 app.use('/api', require('./routes/api/connect'));
+app.use('/chatgpt', require('./routes/api/openAI'));
 
 
 

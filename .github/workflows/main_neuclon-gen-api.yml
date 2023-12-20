@@ -59,4 +59,4 @@ jobs:
           app-name: 'neuclon-gen-api'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_922B9485685D45E0AC381F8DF455E96B }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B8CD99D3CC3343F78E631D227826EC84 }}

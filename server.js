@@ -43,8 +43,8 @@ app.get('/', (req, res) => {
 //     }
 // })
 
-app.use('/api', require('./routes/api/connect'));
-app.use('/chatgpt', require('./routes/api/openAI'));
+// app.use('/api', require('./routes/api/connect'));
+// app.use('/chatgpt', require('./routes/api/openAI'));
 
 
 

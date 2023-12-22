@@ -28,9 +28,9 @@ app.use((req, res, next) => {
     next();
 })
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, './client/build/index.html'));
-});
+// app.get('/', (req, res) => {
+//     res.sendFile(path.join(__dirname, './client/build/index.html'));
+// });
 
 app.use('/api', require('./routes/api/connect'));
 // app.use('/chatgpt', require('./routes/api/openAI'));

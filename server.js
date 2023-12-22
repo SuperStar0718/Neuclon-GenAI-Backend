@@ -32,23 +32,8 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, './client/build/index.html'));
 });
 
-// app.post('/api/connect', async(req, res) => {
-//     console.log('req.body', req.body)
-//     try{
-//         const connection = await db.connectToDatabase(req.body);
-//         res.json( connection)
-//     } catch(err) {
-//         console.log('error', err)
-//         res.status(500).json({message: 'Whoops, something went wrong.'})
-//     }
-// })
-
-// app.use('/api', require('./routes/api/connect'));
+app.use('/api', require('./routes/api/connect'));
 // app.use('/chatgpt', require('./routes/api/openAI'));
-
-
-
-
 
 app.listen(port, () => {
     console.log(`Server listening on the port  ${port}`);

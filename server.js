@@ -14,12 +14,10 @@ if(process.env.ENVIRONMENT !== 'production') {
 
 connectDB();
 
-
 const app = express();
 const port = process.env.PORT || 8080;
 
 app.use(cors());
-// app.use(express.static(path.join(__dirname, './client/build')));
 app.use(bodyParser.json());
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,12 +26,9 @@ app.use((req, res, next) => {
     next();
 })
 
-// app.get('/', (req, res) => {
-//     res.sendFile(path.join(__dirname, './client/build/index.html'));
-// });
 
 app.use('/api', require('./routes/api/connect'));
-// app.use('/chatgpt', require('./routes/api/openAI'));
+app.use('/chatgpt', require('./routes/api/openAI'));
 
 app.listen(port, () => {
     console.log(`Server listening on the port  ${port}`);

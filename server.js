@@ -12,7 +12,7 @@ if(process.env.ENVIRONMENT !== 'production') {
     require('dotenv').config()
 }
 
-// connectDB();
+connectDB();
 
 
 const app = express();

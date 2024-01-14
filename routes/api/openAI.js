@@ -196,16 +196,16 @@ async function uploadFile() {
     return file_ids;
 }
 
-async function getAllDataFromDB() {
-    //find data that has status as connected from mongodb
-    const connections = await Connection.find({ status: "connected" });
+async function getAllDataFromDB(selectedDataset) {
     let data = [];
-    //loop through connections
-    for (let i = 0; i < connections.length; i++) {
-        // connections.forEach(async connection => {
-        const connection = connections[i];
+    selectedDataset = JSON.parse(selectedDataset);
+    console.log('selected Dataset', selectedDataset);
+    for(let i=0; i<selectedDataset.length; i++) {
+        const dataset = selectedDataset[i];
         let client, sampleData, headers, csvWriter;
-        switch (connection.type) {
+        const connection = await Connection.findOne({ status: "connected" , type: dataset.db_type });
+
+        switch (dataset.db_type) {
             case "mongodb":
                 if (connection.uri) {
                     client = new MongoClient(connection.uri, {
@@ -222,20 +222,9 @@ async function getAllDataFromDB() {
                     );
                 }
                 await client.connect();
-                //get all database from dbconnection
-                // Get all database names
-                const databases = await client.db().admin().listDatabases();
+                const db = client.db(dataset.db_name);
 
-                // for (let dbObject of databases.databases) {
-                // console.log(`Database: ${dbObject.name}`);
-                const db = client.db("InterferenceData");
-
-                // Get all collections for the current database
-                const collections = await db.listCollections().toArray();
-
-                // for (let collectionObject of collections) {
-                // console.log(`  Collection: ${collectionObject.name}`);
-                const collection = db.collection("Interference Data");
+                const collection = db.collection(dataset.name);
 
                 // Get all collectionData in the current collection
                 const collectionData = await collection.find().toArray();
@@ -254,7 +243,7 @@ async function getAllDataFromDB() {
                 // Fetch a single document to determine fields
                 sampleData = await collection.findOne({});
                 if (!sampleData) {
-                    throw new Error("No data found in collection");
+                    continue
                 }
 
                 // Extract field names (keys) for CSV headers except for only _id field.
@@ -264,7 +253,7 @@ async function getAllDataFromDB() {
 
                 // Configure CSV writer
                 csvWriter = createCsvWriter({
-                    path: "dataFiles/mongodb.csv",
+                    path: `dataFiles/${dataset.name}.csv`,
                     header: headers,
                 });
                 // Modify each record
@@ -311,7 +300,7 @@ async function getAllDataFromDB() {
 
                 // Fetch a single document to determine fields
                 if (!data[0]) {
-                    throw new Error("No data found in collection");
+                    continue
                 }
 
                 // Extract field names (keys) for CSV headers except for only _id field.
@@ -321,7 +310,7 @@ async function getAllDataFromDB() {
 
                 // Configure CSV writer
                 csvWriter = createCsvWriter({
-                    path: "dataFiles/postgres.csv",
+                    path: `dataFiles/${dataset.name}.csv`,
                     header: headers,
                 });
                 // Modify each record
@@ -351,7 +340,9 @@ async function getAllDataFromDB() {
                 data = data.concat(result.recordset);
                 break;
         }
+
     }
+ 
 
     return data;
 }
@@ -434,7 +425,7 @@ router.post("/generateResponseFromChatGPT/", async (req, res) => {
         //   console.log(file);
         //   await openai.files.del(file.id);
         // }
-        await getAllDataFromDB();
+        await getAllDataFromDB(request.selectedDataset);
         await addCommaEndOfLine("dataFiles");
 
         console.log("user prompt:", request);

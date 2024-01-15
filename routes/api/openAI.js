@@ -78,19 +78,34 @@ async function Chat(msg) {
     // threadMessages.data[0].content.forEach(async message => {
     if (message.type == "text") {
       console.log("text message:", message.text.value);
+      console.log("annotations:", message.text.annotations);
       const annotations = message.text.annotations;
       let messageContent = message.text;
       let citations = [];
       try {
         for (let index = 0; index < annotations.length; index++) {
           if (annotations.length == 0) break;
-          let annotation = annotations[i];
+          let annotation = annotations[index];
           console.log("annotation:", annotation);
           //Replace the text with a footnote
-          messageContent.value = messageContent.value.replace(
-            annotation.text,
-            ` [${index}]`
-          );
+
+          await openai.files
+            .retrieve(annotation.file_path.file_id)
+            .then((citedFile) => {
+              citations.push(
+                `[${index}] Click <here> to download ${citedFile.filename}`
+              );
+              const fileName = path.basename(citedFile.filename);
+              messageContent.value = messageContent.value.replace(
+                /\[([^[\]]+)\]\(sandbox:\/mnt\/data\/([^)]+)\)/g,
+                "</pre><a href='#' class='" +
+                  annotation.file_path.file_id +" "+
+                  fileName +
+                  "' >$1</a><pre>"
+              );
+            });
+
+          console.log("messagecontent.value: ", messageContent.value);
 
           // Gather citations based on annotation attributes
           if (annotation.file_citation) {
@@ -136,11 +151,8 @@ async function Chat(msg) {
         console.log("error: ", error);
       }
       console.log("citations:", citations);
-      result +=
-        "<pre class='whitespace-pre-wrap'>" +
-        messageContent.value +
-        citations.join("\n") +
-        "</pre>";
+      result += "<pre class='whitespace-pre-wrap'>" + messageContent.value;
+      ("</pre>");
     }
     if (message.type == "image_file") {
       const response = await openai.files.content(message.image_file.file_id);
@@ -444,6 +456,39 @@ router.post("/sendMessage", async (req, res) => {
   messageMap.set(id, messages); // Store the messages object in the map
   console.log(messageMap);
   res.json({ id }); // Send the id to the client
+});
+
+router.get("/downloadFile/:id", async (req, res) => {
+  const fileId = req.params.id;
+
+  await openai.files.retrieve(fileId).then((citedFile) => {
+    const fileName = path.basename(citedFile.filename);
+    const filePath = "./download_files/" + fileId;
+    if (fs.existsSync(filePath)) {
+      console.log("file exists");
+      // Set the appropriate headers for the file download
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      res.setHeader("Content-Type", "application/octet-stream");
+
+      // Create a read stream from the file
+      const fileStream = fs.createReadStream(filePath);
+
+      // Pipe the file stream to the response object
+      fileStream.pipe(res);
+    } else {
+      res.status(404).send("File not found");
+    }
+    // Set the headers to suggest a file download with the original file name
+    // res.download(filePath, fileName, (err) => {
+    //     if (err) {
+    //         // Handle error, but don't expose to the client
+    //         console.error(err);
+    //         res.status(500).send(
+    //             "Error occurred while downloading the file."
+    //         );
+    //     }
+    // });
+  });
 });
 
 module.exports = router;

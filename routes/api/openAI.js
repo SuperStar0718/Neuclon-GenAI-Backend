@@ -297,7 +297,7 @@ async function getAllDataFromDB(selectedDataset) {
           port: parseInt(connection.port),
         });
         await client.connect();
-        const res = await client.query('SELECT * FROM public."SalesOrders"');
+        const res = await client.query('SELECT * FROM public.'+ dataset.name );
         // console.log('res:', res)
         data = res.rows;
         // Format Timestamp field in each document
@@ -433,7 +433,9 @@ router.post("/generateResponseFromChatGPT/", async (req, res) => {
     //   console.log(file);
     //   await openai.files.del(file.id);
     // }
-    await getAllDataFromDB(request.selectedDataset);
+    
+    if(request.selectedDataset)
+      await getAllDataFromDB(request.selectedDataset);
     await addCommaEndOfLine("dataFiles");
 
     console.log("user prompt:", request);

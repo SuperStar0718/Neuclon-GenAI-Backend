@@ -27,6 +27,9 @@ const ConnectionSchema = new mongoose.Schema({
     uri: {
         type: String,
     },
+    tables:{
+        type: String,
+    },
     status:{
         type: String,
         required: true,

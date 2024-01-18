@@ -21,9 +21,6 @@ const ConnectionSchema = new mongoose.Schema({
     password: {
         type: String,
     },
-    dbname: {
-        type: String,
-    },
     uri: {
         type: String,
     },

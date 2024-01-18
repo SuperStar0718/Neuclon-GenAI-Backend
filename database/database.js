@@ -9,33 +9,39 @@ class Database {
       case "mongodb":
         //if exist dbInfo.uri, use it
         if (dbInfo.uri) {
-          const database = dbInfo.uri.split("/");
-          const dbName = database[database.length - 1];
           // Create a new MongoClient
           const client = new MongoClient(dbInfo.uri, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
           });
           await client.connect();
-          const collectionNamesObject = await client
-            .db(dbName)
-            .listCollections()
-            .toArray();
-          const collectionNames = collectionNamesObject.reduce(
-            (obj, collection) => {
-              obj[collection.name] = true;
-              return obj;
-            },
-            {}
+          const url = new URL(dbInfo.uri);
+          const databasesList = await client.db().admin().listDatabases();
+          console.log("databaselist:", databasesList);
+          const databasesWithCollections = await Promise.all(
+            databasesList.databases.map(async (database) => {
+              const collectionsData = await client
+                .db(database.name)
+                .listCollections()
+                .toArray();
+              const collections = collectionsData.map((collection) => {
+                return collection.name;
+              });
+              return {
+                dbname: database.name,
+                collections: collections,
+              };
+            })
           );
-          const connection = {
+
+          console.log(databasesWithCollections);
+          return {
             type: "mongodb",
             uri: dbInfo.uri,
+            host: url.hostname,
             status: "connected",
-            tables: JSON.stringify(collectionNames),
-            dbname: dbName,
+            tables: JSON.stringify(databasesWithCollections),
           };
-          return connection;
         } else {
           const client = new MongoClient(
             `mongodb+srv://${dbInfo.username}:${dbInfo.password}@${dbInfo.host}/${dbInfo.databaseName}`,
@@ -45,36 +51,38 @@ class Database {
             }
           );
           await client.connect();
-          const collectionNamesObject = await client
-            .db(dbInfo.databaseName)
-            .listCollections()
-            .toArray();
-          const collectionNames = collectionNamesObject.reduce(
-            (obj, collection) => {
-              obj[collection.name] = true;
-              return obj;
-            },
-            {}
+          const databasesList = await client.db().admin().listDatabases();
+          console.log("databaselist:", databasesList);
+          const databasesWithCollections = await Promise.all(
+            databasesList.databases.map(async (database) => {
+              const collectionsData = await client
+                .db(database.name)
+                .listCollections()
+                .toArray();
+              const collections = collectionsData.map((collection) => {
+                return collection.name;
+              });
+              return {
+                dbname: database.name,
+                collections: collections,
+              };
+            })
           );
-          console.log("Mongodb connected successfully");
-          const connection = {
+
+          console.log(databasesWithCollections);
+          return {
             type: "mongodb",
-            username: dbInfo.username,
-            password: dbInfo.password,
+            uri: dbInfo.uri,
             host: dbInfo.host,
-            dbname: dbInfo.databaseName,
-            port: dbInfo.port,
-            tables: JSON.stringify(collectionNames),
             status: "connected",
+            tables: JSON.stringify(databasesWithCollections),
           };
-          return connection;
         }
       case "mssql": {
         const client = await mssql.connect({
           user: dbInfo.user,
           password: dbInfo.password,
           server: dbInfo.host,
-          database: dbInfo.databaseName,
           port: parseInt(dbInfo.port),
         });
         const connection = {
@@ -82,7 +90,6 @@ class Database {
           username: dbInfo.username,
           password: dbInfo.password,
           host: dbInfo.host,
-          dbname: dbInfo.databaseName,
           port: dbInfo.port,
           status: "connected",
         };
@@ -92,27 +99,47 @@ class Database {
         const client = new Client({
           user: dbInfo.username,
           host: dbInfo.host,
-          database: dbInfo.databaseName,
           password: dbInfo.password,
           port: parseInt(dbInfo.port),
         });
         await client.connect();
-        const res = await client.query(`
+
+        const DBNamesData = await client.query(
+          "SELECT datname FROM pg_database WHERE datistemplate = false;"
+        );
+        console.log("all databases:", DBNamesData);
+        let tableNames = [];
+
+        for (let i = 0; i < DBNamesData.rows.length; i++) {
+          const dbName = DBNamesData.rows[i].datname;
+          const connection = new Client({
+            user: dbInfo.username,
+            host: dbInfo.host,
+            password: dbInfo.password,
+            port: parseInt(dbInfo.port),
+            database: dbName,
+          });
+
+          await connection.connect();
+
+          const res = await connection.query(`
             SELECT table_name FROM information_schema.tables WHERE table_schema='public'
           `);
-        console.log("res:", res);
-        const tables = res.rows.map((row) => row.table_name);
-        const tableNames = tables.reduce((obj, table) => {
-          obj[table] = true;
-          return obj;
-        }, {});
+          const tables = res.rows.map((row) => row.table_name);
+
+          tableNames.push({
+            dbname: dbName,
+            collections: tables,
+          });
+        }
         console.log("tables:", tableNames);
+
         const connection = {
           type: "postgre",
           username: dbInfo.username,
           password: dbInfo.password,
           host: dbInfo.host,
-          dbname: dbInfo.databaseName,
+          dbname: dbInfo.dbname,
           port: dbInfo.port,
           tables: JSON.stringify(tableNames),
           status: "connected",

@@ -18,7 +18,7 @@ router.post("/connect", async (req, res) => {
 
     console.log("connection:", connection);
     await Connection.findOneAndReplace(
-      { type: connection.type, dbname: connection.dbname },
+      { type: connection.type, host: connection.host },
       connection,
       {
         upsert: true,
@@ -35,7 +35,7 @@ router.post("/connectTables", async (req, res) => {
   try {
     const connection = req.body;
     await Connection.findOneAndUpdate(
-      { type: connection.type, dbname: connection.dbname },
+      { type: connection.type, host: connection.host },
       { $set: connection },
       {
         upsert: true,
@@ -266,11 +266,14 @@ router.get("/getDatabaseList", async (req, res) => {
     const connections = await Connection.find({ status: "connected" });
     let data = [];
     let mongodb_databases,
-      mongodb_collectionsPerDatabase,
+      mongodb_collectionsPerDatabase = [],
       postgres_databases,
-      postgres_collectionsPerDatabase,
+      postgres_collectionsPerDatabase = [],
       mssql_databases,
       mssql_collectionsPerDatabase;
+    let jsonData = [];
+    let index = 0;
+
     //loop through connections
     for (let i = 0; i < connections.length; i++) {
       // connections.forEach(async connection => {
@@ -278,191 +281,86 @@ router.get("/getDatabaseList", async (req, res) => {
       let client;
       switch (connection.type) {
         case "mongodb":
-          if (connection.uri) {
-            client = new MongoClient(connection.uri, {
-              useNewUrlParser: true,
-              useUnifiedTopology: true,
+          index++;
+          jsonData.push({
+            ID: index,
+            name: "MongoDB",
+            expanded: true,
+          });
+          JSON.parse(connection.tables).forEach((table, i) => {
+            jsonData.push({
+              ID: `${index}_${i + 1}`,
+              categoryId: index,
+              name: table.name,
             });
-          } else {
-            client = new MongoClient(
-              `mongodb+srv://${connection.username}:${connection.password}@${connection.host}/${connection.databaseName}`,
-              {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-              }
-            );
-          }
-          await client.connect();
-
-          // Get all database names
-          const databaseNames = await client.db().admin().listDatabases();
-          mongodb_databases = databaseNames.databases
-            .map((db) => db.name)
-            .filter((name) => name !== "admin" && name !== "local");
-
-          // Get all collections per database
-          mongodb_collectionsPerDatabase = {};
-          for (const database of mongodb_databases) {
-            const collectionNames = await client
-              .db(database)
-              .listCollections()
-              .toArray();
-            const collections = collectionNames.map(
-              (collection) => collection.name
-            );
-            mongodb_collectionsPerDatabase[database] = collections;
-          }
-
+            table.collections.forEach((collection, j) => {
+              jsonData.push({
+                ID: `${index}_${i + 1}_${j + 1}`,
+                categoryId: `${index}_${i + 1}`,
+                name: collection,
+                leaf: true,
+                db_type: "mongodb",
+                db_name: table.name,
+              });
+            });
+          });
           break;
         case "postgre":
-          client = new Client({
-            user: connection.username,
-            host: connection.host,
-            password: connection.password,
-            port: parseInt(connection.port),
-            database: "",
+          index++;
+
+          jsonData.push({
+            ID: index,
+            name: "PostgreSQL",
+            expanded: true,
           });
-          await client.connect();
-
-          // Get all database names
-          const databaseQuery =
-            "SELECT datname FROM pg_database WHERE datistemplate = false;";
-          const databaseResult = await client.query(databaseQuery);
-          postgres_databases = databaseResult.rows
-            .map((row) => row.datname)
-            .filter((name) => name !== "readme_to_recover");
-
-          // Get all table names per database
-          postgres_collectionsPerDatabase = {};
-          for (const database of postgres_databases) {
-            const tables = await getTablesFromPostgresDatabase(
-              database,
-              connection
-            );
-            postgres_collectionsPerDatabase[database] = tables;
-          }
-          await client.end();
+          JSON.parse(connection.tables).forEach((table, i) => {
+            jsonData.push({
+              ID: `${index}_${i + 1}`,
+              categoryId: index,
+              name: table.name,
+            });
+            table.collections.forEach((collection, j) => {
+              jsonData.push({
+                ID: `${index}_${i + 1}_${j + 1}`,
+                categoryId: `${index}_${i + 1}`,
+                name: collection,
+                leaf: true,
+                db_type: "postgre",
+                db_name: table.name,
+              });
+            });
+          });
           break;
         case "mssql":
-          client = await mssql.connect({
-            user: connection.username,
-            password: connection.password,
-            server: connection.host,
-            database: connection.databaseName,
-            port: parseInt(connection.port),
-          });
-          try {
-            // Get all database names
-            const databaseQuery =
-              "SELECT name FROM sys.databases WHERE database_id > 4;";
-            const databaseResult = await pool.request().query(databaseQuery);
-            mssql_databases = databaseResult.recordset.map((row) => row.name);
+          index++;
 
-            // Get all table names per database
-            mssql_collectionsPerDatabase = {};
-            for (const database of mssql_databases) {
-              const tableQuery = `SELECT name FROM ${database}.sys.tables;`;
-              const tableResult = await pool.request().query(tableQuery);
-              const tables = tableResult.recordset.map((row) => row.name);
-              mssql_collectionsPerDatabase[database] = tables;
-            }
-          } finally {
-            client.close();
-          }
+          jsonData.push({
+            ID: index,
+            name: "MSSQL",
+            expanded: true,
+          });
+          JSON.parse(connection.tables).forEach((table, i) => {
+            jsonData.push({
+              ID: `${index}_${i + 1}`,
+              categoryId: index,
+              name: table.name,
+            });
+            table.collections.forEach((collection, j) => {
+              jsonData.push({
+                ID: `${index}_${i + 1}_${j + 1}`,
+                categoryId: `${index}_${i + 1}`,
+                name: collection,
+                leaf: true,
+                db_type: "mssql",
+                db_name: table.name,
+              });
+            });
+          });
           break;
       }
     }
 
-    let jsonData = [];
-    let index = 0;
-    if (mongodb_databases) {
-      index++;
-      jsonData.push({
-        ID: index,
-        name: "MongoDB",
-        expanded: true,
-      });
-      for (let i = 0; i < mongodb_databases.length; i++) {
-        jsonData.push({
-          ID: `${index}_${i + 1}`,
-          categoryId: index,
-          name: mongodb_databases[i],
-        });
-        for (
-          let j = 0;
-          j < mongodb_collectionsPerDatabase[mongodb_databases[i]].length;
-          j++
-        ) {
-          jsonData.push({
-            ID: `${index}_${i + 1}_${j + 1}`,
-            categoryId: `${index}_${i + 1}`,
-            name: mongodb_collectionsPerDatabase[mongodb_databases[i]][j],
-            leaf: true,
-            db_type: "mongodb",
-            db_name: mongodb_databases[i],
-          });
-        }
-      }
-    }
-
-    if (postgres_databases) {
-      index++;
-      jsonData.push({
-        ID: index,
-        name: "PostgreSQL",
-      });
-      for (let i = 0; i < postgres_databases.length; i++) {
-        jsonData.push({
-          ID: `${index}_${i + 1}`,
-          categoryId: index,
-          name: postgres_databases[i],
-        });
-        for (
-          let j = 0;
-          j < postgres_collectionsPerDatabase[postgres_databases[i]].length;
-          j++
-        ) {
-          jsonData.push({
-            ID: `${index}_${i + 1}_${j + 1}`,
-            categoryId: `${index}_${i + 1}`,
-            name: postgres_collectionsPerDatabase[postgres_databases[i]][j],
-            leaf: true,
-            db_type: "postgre",
-            db_name: postgres_databases[i],
-          });
-        }
-      }
-    }
-    if (mssql_databases) {
-      index++;
-      jsonData.push({
-        ID: index,
-        name: "MSSQL",
-      });
-      for (let i = 0; i < mssql_databases.length; i++) {
-        jsonData.push({
-          ID: `${index}_${i + 1}`,
-          categoryId: index,
-          name: mssql_databases[i],
-        });
-
-        for (
-          let j = 0;
-          j < mssql_collectionsPerDatabase[mssql_databases[i]].length;
-          j++
-        ) {
-          jsonData.push({
-            ID: `${index}_${i + 1}_${j + 1}`,
-            categoryId: `${index}_${i + 1}`,
-            name: mssql_collectionsPerDatabase[mssql_databases[i]][j],
-            leaf: true,
-            db_type: "mssql",
-            db_name: mssql_databases[i],
-          });
-        }
-      }
-    }
-
+    console.log("jsonData:", jsonData);
     res.json(jsonData);
   } catch (err) {
     console.log("error catch", err);

@@ -6,7 +6,7 @@ const { MongoClient } = require("mongodb");
 class Database {
   async connectToDatabase(dbInfo) {
     switch (dbInfo.type) {
-      case "mongodb":
+      case "MongoDB":
         //if exist dbInfo.uri, use it
         if (dbInfo.uri) {
           // Create a new MongoClient
@@ -25,10 +25,10 @@ class Database {
                 .listCollections()
                 .toArray();
               const collections = collectionsData.map((collection) => {
-                return collection.name;
+                return { collectionName: collection.name, status: true };
               });
               return {
-                dbname: database.name,
+                name: database.name,
                 collections: collections,
               };
             })
@@ -60,7 +60,7 @@ class Database {
                 .listCollections()
                 .toArray();
               const collections = collectionsData.map((collection) => {
-                return collection.name;
+                return { collectionName: collection.name, status: true };
               });
               return {
                 dbname: database.name,
@@ -125,8 +125,10 @@ class Database {
           const res = await connection.query(`
             SELECT table_name FROM information_schema.tables WHERE table_schema='public'
           `);
-          const tables = res.rows.map((row) => row.table_name);
-
+          const tables = res.rows.map((row) => ({
+            collectionName: row.table_name,
+            status: true,
+          }));
           tableNames.push({
             dbname: dbName,
             collections: tables,

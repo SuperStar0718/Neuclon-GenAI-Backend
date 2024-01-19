@@ -17,14 +17,15 @@ router.post("/connect", async (req, res) => {
     const connection = await db.connectToDatabase(req.body);
 
     console.log("connection:", connection);
-    await Connection.findOneAndReplace(
+    const response = await Connection.findOneAndReplace(
       { type: connection.type, host: connection.host },
       connection,
       {
         upsert: true,
+        new: true,
       }
     );
-    res.json(connection);
+    res.json(response);
   } catch (err) {
     console.log("error catch", err);
     res.status(500).json({ message: "Whoops, something went wrong." });
@@ -53,12 +54,51 @@ router.get("/getAllConnections", async (req, res) => {
   res.json(connections);
 });
 
+router.post("/refreshConnection", async (req, res) => {
+  try {
+    console.log("req.body in refresh", req.body);
+    const tableInfo = await Connection.findOne({
+      type: req.body.type,
+      host: req.body.host,
+    });
+    let dataSets = JSON.parse(tableInfo.tables);
+    dataSets.forEach(async (dataSet) => {
+      dataSet.collections.forEach(async (collection) => {
+        if (collection.collectionName === req.body.dataset.collectionName)
+          collection.status = true;
+      });
+    });
+
+    const connection = await Connection.findOneAndUpdate(
+      { type: req.body.type, host: req.body.host },
+      { tables: JSON.stringify(dataSets) },
+      { new: true }
+    );
+
+    res.json(connection);
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
+});
+
 router.post("/stopConnection", async (req, res) => {
   try {
-    req.body.status = "disconnected";
+    console.log("req.body", req.body);
+    const tableInfo = await Connection.findOne({
+      type: req.body.type,
+      host: req.body.host,
+    });
+    let dataSets = JSON.parse(tableInfo.tables);
+    dataSets.forEach(async (dataSet) => {
+      dataSet.collections.forEach(async (collection) => {
+        if (collection.collectionName === req.body.dataset.collectionName)
+          collection.status = false;
+      });
+    });
     const connection = await Connection.findOneAndUpdate(
-      { type: req.body.type },
-      { status: "disconnected" },
+      { type: req.body.type, host: req.body.host },
+      { tables: JSON.stringify(dataSets) },
       { new: true }
     );
     console.log("req.body", connection);
@@ -73,10 +113,28 @@ router.post("/stopConnection", async (req, res) => {
 
 router.post("/deleteConnection", async (req, res) => {
   try {
-    const connection = await Connection.findOneAndDelete({
+    const tableInfo = await Connection.findOne({
       type: req.body.type,
+      host: req.body.host,
     });
-    console.log("deleted connection");
+    let dataSets = JSON.parse(tableInfo.tables);
+    let updateDatasets = dataSets.map((dataSet) => {
+      const collections = dataSet.collections.filter(
+        (collection) =>
+          collection.collectionName !== req.body.dataset.collectionName
+      );
+      dataSet.collections = collections;
+      return dataSet;
+    });
+    updateDatasets = updateDatasets.filter(
+      (dataSet) => dataSet.collections.length > 0
+    );
+    const connection = await Connection.findOneAndUpdate(
+      { type: req.body.type, host: req.body.host },
+      { tables: JSON.stringify(updateDatasets) },
+      { new: true }
+    );
+    console.log("deleted connection:", updateDatasets);
     res.json(connection);
   } catch (err) {
     console.log("error catch", err);
@@ -263,7 +321,7 @@ router.post("/deleteData", async (req, res) => {
 router.get("/getDatabaseList", async (req, res) => {
   try {
     //find data that has status as connected from mongodb
-    const connections = await Connection.find({ status: "connected" });
+    const connections = await Connection.find();
     let data = [];
     let mongodb_databases,
       mongodb_collectionsPerDatabase = [],
@@ -281,6 +339,7 @@ router.get("/getDatabaseList", async (req, res) => {
       let client;
       switch (connection.type) {
         case "MongoDB":
+          if (JSON.parse(connection.tables).length === 0) break;
           index++;
           jsonData.push({
             ID: index,
@@ -294,18 +353,21 @@ router.get("/getDatabaseList", async (req, res) => {
               name: table.name,
             });
             table.collections.forEach((collection, j) => {
-              jsonData.push({
-                ID: `${index}_${i + 1}_${j + 1}`,
-                categoryId: `${index}_${i + 1}`,
-                name: collection,
-                leaf: true,
-                db_type: "MongoDB",
-                db_name: table.name,
-              });
+              if (collection.status)
+                jsonData.push({
+                  ID: `${index}_${i + 1}_${j + 1}`,
+                  categoryId: `${index}_${i + 1}`,
+                  name: collection.collectionName,
+                  leaf: true,
+                  db_type: "MongoDB",
+                  db_name: table.name,
+                });
             });
           });
           break;
         case "PostgreSQL":
+          if (JSON.parse(connection.tables).length === 0) break;
+
           index++;
 
           jsonData.push({
@@ -320,18 +382,21 @@ router.get("/getDatabaseList", async (req, res) => {
               name: table.name,
             });
             table.collections.forEach((collection, j) => {
-              jsonData.push({
-                ID: `${index}_${i + 1}_${j + 1}`,
-                categoryId: `${index}_${i + 1}`,
-                name: collection,
-                leaf: true,
-                db_type: "PostgreSQL",
-                db_name: table.name,
-              });
+              if (collection.status)
+                jsonData.push({
+                  ID: `${index}_${i + 1}_${j + 1}`,
+                  categoryId: `${index}_${i + 1}`,
+                  name: collection.collectionName,
+                  leaf: true,
+                  db_type: "PostgreSQL",
+                  db_name: table.name,
+                });
             });
           });
           break;
         case "mssql":
+          if (JSON.parse(connection.tables).length === 0) break;
+
           index++;
 
           jsonData.push({
@@ -346,14 +411,15 @@ router.get("/getDatabaseList", async (req, res) => {
               name: table.name,
             });
             table.collections.forEach((collection, j) => {
-              jsonData.push({
-                ID: `${index}_${i + 1}_${j + 1}`,
-                categoryId: `${index}_${i + 1}`,
-                name: collection,
-                leaf: true,
-                db_type: "mssql",
-                db_name: table.name,
-              });
+              if (collection.status)
+                jsonData.push({
+                  ID: `${index}_${i + 1}_${j + 1}`,
+                  categoryId: `${index}_${i + 1}`,
+                  name: collection.collectionName,
+                  leaf: true,
+                  db_type: "mssql",
+                  db_name: table.name,
+                });
             });
           });
           break;

@@ -99,7 +99,8 @@ async function Chat(msg) {
               messageContent.value = messageContent.value.replace(
                 /\[([^[\]]+)\]\(sandbox:\/mnt\/data\/([^)]+)\)/g,
                 "</pre><a href='#' class='" +
-                  annotation.file_path.file_id +" "+
+                  annotation.file_path.file_id +
+                  " " +
                   fileName +
                   "' >$1</a><pre>"
               );
@@ -220,7 +221,7 @@ async function getAllDataFromDB(selectedDataset) {
     });
 
     switch (dataset.db_type) {
-      case "mongodb":
+      case "MongoDB":
         if (connection.uri) {
           client = new MongoClient(connection.uri, {
             useNewUrlParser: true,
@@ -288,7 +289,7 @@ async function getAllDataFromDB(selectedDataset) {
         // }
         // console.log('data:', data)
         break;
-      case "postgre":
+      case "PostgreSQL":
         client = new Client({
           user: connection.username,
           host: connection.host,
@@ -297,7 +298,7 @@ async function getAllDataFromDB(selectedDataset) {
           port: parseInt(connection.port),
         });
         await client.connect();
-        const res = await client.query('SELECT * FROM public.'+ dataset.name );
+        const res = await client.query("SELECT * FROM public." + dataset.name);
         // console.log('res:', res)
         data = res.rows;
         // Format Timestamp field in each document
@@ -433,8 +434,8 @@ router.post("/generateResponseFromChatGPT/", async (req, res) => {
     //   console.log(file);
     //   await openai.files.del(file.id);
     // }
-    
-    if(request.selectedDataset)
+
+    if (request.selectedDataset)
       await getAllDataFromDB(request.selectedDataset);
     await addCommaEndOfLine("dataFiles");
 

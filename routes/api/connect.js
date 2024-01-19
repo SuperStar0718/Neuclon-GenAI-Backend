@@ -93,7 +93,7 @@ router.post("/getData", async (req, res) => {
   let collectionData = [];
 
   let client;
-  if (connection.type === "mongodb") {
+  if (connection.type === "MongoDB") {
     if (connection.uri) {
       client = new MongoClient(connection.uri, {
         useNewUrlParser: true,
@@ -171,11 +171,11 @@ router.post("/getData", async (req, res) => {
 router.post("/saveData", async (req, res) => {
   try {
     switch (req.body.db) {
-      case "mongodb":
+      case "MongoDB":
         //find data that has status as connected and type is mongodb
         const connection = await Connection.findOne({
           status: "connected",
-          type: "mongodb",
+          type: "MongoDB",
         });
         if (!connection) {
           res.status(500).json({ message: "No connection found." });
@@ -219,11 +219,11 @@ router.post("/saveData", async (req, res) => {
 router.post("/deleteData", async (req, res) => {
   try {
     switch (req.body.db) {
-      case "mongodb":
+      case "MongoDB":
         //find data that has status as connected and type is mongodb
         const connection = await Connection.findOne({
           status: "connected",
-          type: "mongodb",
+          type: "MongoDB",
         });
         if (!connection) {
           res.status(500).json({ message: "No connection found." });
@@ -280,7 +280,7 @@ router.get("/getDatabaseList", async (req, res) => {
       const connection = connections[i];
       let client;
       switch (connection.type) {
-        case "mongodb":
+        case "MongoDB":
           index++;
           jsonData.push({
             ID: index,
@@ -299,13 +299,13 @@ router.get("/getDatabaseList", async (req, res) => {
                 categoryId: `${index}_${i + 1}`,
                 name: collection,
                 leaf: true,
-                db_type: "mongodb",
+                db_type: "MongoDB",
                 db_name: table.name,
               });
             });
           });
           break;
-        case "postgre":
+        case "PostgreSQL":
           index++;
 
           jsonData.push({
@@ -325,7 +325,7 @@ router.get("/getDatabaseList", async (req, res) => {
                 categoryId: `${index}_${i + 1}`,
                 name: collection,
                 leaf: true,
-                db_type: "postgre",
+                db_type: "PostgreSQL",
                 db_name: table.name,
               });
             });

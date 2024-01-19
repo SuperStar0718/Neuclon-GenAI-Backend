@@ -36,7 +36,7 @@ class Database {
 
           console.log(databasesWithCollections);
           return {
-            type: "mongodb",
+            type: "MongoDB",
             uri: dbInfo.uri,
             host: url.hostname,
             status: "connected",
@@ -71,7 +71,7 @@ class Database {
 
           console.log(databasesWithCollections);
           return {
-            type: "mongodb",
+            type: "MongoDB",
             uri: dbInfo.uri,
             host: dbInfo.host,
             status: "connected",

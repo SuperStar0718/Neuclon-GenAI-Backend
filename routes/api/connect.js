@@ -4,6 +4,7 @@ const db = require("../../database/database");
 const { MongoClient, ObjectId } = require("mongodb");
 const { Client } = require("pg");
 const mongoose = require("mongoose");
+const mssql = require("mssql");
 
 const Connection = require("../../models/Connection");
 
@@ -149,80 +150,95 @@ router.post("/getData", async (req, res) => {
     host: req.body.host,
   });
   let collectionData = [];
-
-  let client;
-  if (connection.type === "MongoDB") {
-    if (connection.uri) {
-      client = new MongoClient(connection.uri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    } else {
-      client = new MongoClient(
-        `mongodb+srv://${connection.username}:${connection.password}@${connection.host}`,
-        {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
+  let client = null;
+  console.log("connection:", connection);
+  try {
+    switch (connection.type) {
+      case "MongoDB":
+      case "QuickBooks":
+      case "SAP":
+      case "Tulip":
+      case "MasterControl":
+      case "FedEx":
+      case "ADP":
+        if (connection.uri) {
+          client = new MongoClient(connection.uri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+          });
+        } else {
+          client = new MongoClient(
+            `mongodb+srv://${connection.username}:${connection.password}@${connection.host}`,
+            {
+              useNewUrlParser: true,
+              useUnifiedTopology: true,
+            }
+          );
         }
-      );
+        await client.connect();
+        const db = client.db(req.body.db_name);
+        const collection = db.collection(req.body.name);
+
+        // Get all collectionData in the current collection
+        collectionData = await collection.find().toArray();
+        client.close();
+        res.json(collectionData);
+      case "postgre":
+        client = new Client({
+          user: connection.username,
+          host: connection.host,
+          database: req.body.db_name,
+          password: connection.password,
+          port: parseInt(connection.port),
+        });
+
+        // Connect to the PostgreSQL database
+        client
+          .connect()
+          .then(() => {
+            // console.log("Connected to the PostgreSQL database");
+
+            // Query the specific table in the database
+            const query = `SELECT * FROM public."${req.body.name}"`;
+            return client.query(query);
+          })
+          .then((result) => {
+            // Retrieve the data from the query result
+            const data = result.rows;
+            // console.log("Retrieved data:", data);
+
+            // Perform any further operations with the data
+
+            // Disconnect from the PostgreSQL database
+            client.end();
+            res.json(data);
+          })
+          .catch((error) => {
+            console.error(
+              "Error connecting to the PostgreSQL database:",
+              error
+            );
+          });
+      case "mssql":
+        client = await mssql.connect({
+          user: connection.username,
+          password: connection.password,
+          server: connection.host,
+          database: req.body.db_name,
+          port: parseInt(connection.port),
+        });
+        try {
+          // Get all collectionData in the current collection
+          collectionData = await pool
+            .request()
+            .query(`SELECT * FROM ${req.body.name}`);
+          res.json(collectionData.recordset);
+        } finally {
+          client.close();
+        }
     }
-    await client.connect();
-    const db = client.db(req.body.db_name);
-    const collection = db.collection(req.body.name);
-
-    // Get all collectionData in the current collection
-    collectionData = await collection.find().toArray();
-    res.json(collectionData);
-  } else if (connection.type === "postgre") {
-    client = new Client({
-      user: connection.username,
-      host: connection.host,
-      database: req.body.db_name,
-      password: connection.password,
-      port: parseInt(connection.port),
-    });
-
-    // Connect to the PostgreSQL database
-    client
-      .connect()
-      .then(() => {
-        // console.log("Connected to the PostgreSQL database");
-
-        // Query the specific table in the database
-        const query = `SELECT * FROM public."${req.body.name}"`;
-        return client.query(query);
-      })
-      .then((result) => {
-        // Retrieve the data from the query result
-        const data = result.rows;
-        // console.log("Retrieved data:", data);
-
-        // Perform any further operations with the data
-
-        // Disconnect from the PostgreSQL database
-        client.end();
-        res.json(data);
-      })
-      .catch((error) => {
-        console.error("Error connecting to the PostgreSQL database:", error);
-      });
-  } else if (connection.type === "mssql") {
-    const client = await mssql.connect({
-      user: connection.username,
-      password: connection.password,
-      server: connection.host,
-      database: req.body.db_name,
-      port: parseInt(connection.port),
-    });
-    try {
-      // Get all collectionData in the current collection
-      collectionData = await pool
-        .request()
-        .query(`SELECT * FROM ${req.body.name}`);
-      res.json(collectionData.recordset);
-    } finally {
-      client.close();
-    }
+  } catch (err) {
+    console.log("error catch", err);
   }
 });
 
@@ -264,7 +280,7 @@ router.post("/saveData", async (req, res) => {
         delete updateData._id;
         const update = { $set: updateData };
         const result = await collection.updateOne({ _id: documentId }, update);
-
+        client.close();
         console.log("1 document updated:", result);
         res.json(result);
     }
@@ -308,7 +324,7 @@ router.post("/deleteData", async (req, res) => {
         // Ensure that _id is converted to ObjectId
         const documentId = new ObjectId(req.body.data._id);
         const result = await collection.deleteOne({ _id: documentId });
-
+        client.close();
         console.log("1 document deleted:", result);
         res.json(result);
     }
@@ -339,11 +355,17 @@ router.get("/getDatabaseList", async (req, res) => {
       let client;
       switch (connection.type) {
         case "MongoDB":
+        case "QuickBooks":
+        case "SAP":
+        case "Tulip":
+        case "MasterControl":
+        case "FedEx":
+        case "ADP":
           if (JSON.parse(connection.tables).length === 0) break;
           index++;
           jsonData.push({
             ID: index,
-            name: "MongoDB",
+            name: connection.type,
             expanded: true,
           });
           JSON.parse(connection.tables).forEach((table, i) => {
@@ -359,7 +381,7 @@ router.get("/getDatabaseList", async (req, res) => {
                   categoryId: `${index}_${i + 1}`,
                   name: collection.collectionName,
                   leaf: true,
-                  db_type: "MongoDB",
+                  db_type: connection.type,
                   db_name: table.name,
                   host: connection.host,
                 });

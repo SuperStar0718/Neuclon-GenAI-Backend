@@ -7,6 +7,12 @@ class Database {
   async connectToDatabase(dbInfo) {
     switch (dbInfo.type) {
       case "MongoDB":
+      case "QuickBooks":
+      case "SAP":
+      case "Tulip":
+      case "MasterControl":
+      case "FedEx":
+      case "ADP":
         //if exist dbInfo.uri, use it
         if (dbInfo.uri) {
           // Create a new MongoClient
@@ -35,8 +41,9 @@ class Database {
           );
 
           console.log(databasesWithCollections);
+          client.close();
           return {
-            type: "MongoDB",
+            type: dbInfo.type,
             uri: dbInfo.uri,
             host: url.hostname,
             status: "connected",
@@ -70,8 +77,10 @@ class Database {
           );
 
           console.log(databasesWithCollections);
+          client.close();
+
           return {
-            type: "MongoDB",
+            type: dbInfo.type,
             uri: dbInfo.uri,
             host: dbInfo.host,
             status: "connected",
@@ -93,6 +102,7 @@ class Database {
           port: dbInfo.port,
           status: "connected",
         };
+        client.close();
         return connection;
       }
       case "postgre": {

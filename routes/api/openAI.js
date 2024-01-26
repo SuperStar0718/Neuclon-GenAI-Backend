@@ -285,6 +285,7 @@ async function getAllDataFromDB(selectedDataset) {
         // Write data to CSV
         await csvWriter.writeRecords(data);
         console.log("CSV file written successfully");
+        client.close();
         // }
         // }
         // console.log('data:', data)
@@ -350,6 +351,7 @@ async function getAllDataFromDB(selectedDataset) {
           port: parseInt(connection.port),
         });
         const result = await client.query`SELECT * FROM TraningData`;
+        client.close();
         data = data.concat(result.recordset);
         break;
     }

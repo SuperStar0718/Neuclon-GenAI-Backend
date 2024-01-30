@@ -51,8 +51,14 @@ router.post("/connectTables", async (req, res) => {
 });
 
 router.get("/getAllConnections", async (req, res) => {
-  const connections = await Connection.find();
-  res.json(connections);
+  try {
+    const connections = await Connection.find();
+
+    res.json(connections);
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
 });
 
 router.post("/refreshConnection", async (req, res) => {

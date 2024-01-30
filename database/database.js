@@ -30,9 +30,22 @@ class Database {
                 .db(database.name)
                 .listCollections()
                 .toArray();
-              const collections = collectionsData.map((collection) => {
-                return { collectionName: collection.name, status: true };
-              });
+              console.log("connection data:", database.name, collectionsData);
+              const collections = await Promise.all(
+                collectionsData.map(async (collection) => {
+                  const doc = await client
+                    .db(database.name)
+                    .collection(collection.name)
+                    .findOne();
+                  const headers = doc ? Object.keys(doc) : [];
+                  console.log("headers:", headers);
+                  return {
+                    collectionName: collection.name,
+                    headers: headers.join(", "),
+                    status: true,
+                  };
+                })
+              );
               return {
                 name: database.name,
                 collections: collections,
@@ -40,7 +53,6 @@ class Database {
             })
           );
 
-          console.log(databasesWithCollections);
           client.close();
           return {
             type: dbInfo.type,
@@ -66,8 +78,14 @@ class Database {
                 .db(database.name)
                 .listCollections()
                 .toArray();
-              const collections = collectionsData.map((collection) => {
-                return { collectionName: collection.name, status: true };
+              const collections = collectionsData.map(async (collection) => {
+                const doc = await db.collection(collection.name).findOne();
+                const headers = doc ? Object.keys(doc) : [];
+                return {
+                  collectionName: collection.name,
+                  headers: headers.join(", "),
+                  status: true,
+                };
               });
               return {
                 dbname: database.name,

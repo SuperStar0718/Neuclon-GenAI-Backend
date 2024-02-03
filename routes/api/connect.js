@@ -247,6 +247,150 @@ router.post("/getData", async (req, res) => {
   }
 });
 
+router.post("/getJoinedTableData", async (req, res) => {
+  const connectedNodes = req.body;
+  let collectionData = [];
+  let i;
+  for (i = 0; i < connectedNodes.length; i++) {
+    const node = connectedNodes[i];
+    const connection = await Connection.findOne({
+      host: node.host,
+    });
+    // console.log("connection:", connection);
+    let client = null;
+    try {
+      switch (connection.type) {
+        case "MongoDB":
+        case "QuickBooks":
+        case "SAP":
+        case "Tulip":
+        case "MasterControl":
+        case "FedEx":
+        case "ADP":
+          if (connection.uri) {
+            client = new MongoClient(connection.uri, {
+              useNewUrlParser: true,
+              useUnifiedTopology: true,
+            });
+          } else {
+            client = new MongoClient(
+              `mongodb+srv://${connection.username}:${connection.password}@${connection.host}`,
+              {
+                useNewUrlParser: true,
+                useUnifiedTopology: true,
+              }
+            );
+          }
+          await client.connect();
+          const db = client.db(node.dbname);
+          const collection = db.collection(node.description);
+
+          // Get all collectionData in the current collection
+          collectionData[i] = await collection
+            .find({}, { projection: { _id: 0 } })
+            .toArray();
+          // console.log("collectionData :", collectionData[i]);
+          await client.close();
+          break;
+        case "postgre":
+          client = new Client({
+            user: connection.username,
+            host: connection.host,
+            database: node.dbname,
+            password: connection.password,
+            port: parseInt(connection.port),
+          });
+
+          // Connect to the PostgreSQL database
+          client
+            .connect()
+            .then(() => {
+              // console.log("Connected to the PostgreSQL database");
+
+              // Query the specific table in the database
+              const query = `SELECT * FROM public."${node.description}"`;
+              return client.query(query);
+            })
+            .then(async (result) => {
+              // Retrieve the data from the query result
+              const data = result.rows;
+              // console.log("Retrieved data:", data);
+
+              // Perform any further operations with the data
+
+              // Disconnect from the PostgreSQL database
+              client.end();
+              collectionData[i] = await collection.find().toArray();
+            })
+            .catch((error) => {
+              console.error(
+                "Error connecting to the PostgreSQL database:",
+                error
+              );
+            });
+          break;
+        case "mssql":
+          client = await mssql.connect({
+            user: connection.username,
+            password: connection.password,
+            server: connection.host,
+            database: req.body.db_name,
+            port: parseInt(connection.port),
+          });
+          try {
+            // Get all collectionData in the current collection
+            collectionData = await pool
+              .request()
+              .query(`SELECT * FROM ${node.description}`);
+            collectionData[i] = await collection.find().toArray();
+          } finally {
+            client.close();
+          }
+          break;
+      }
+    } catch (err) {
+      console.log("error catch", err);
+    }
+  }
+  // get the keys of collectionData[0]
+  const key_headers = Object.keys(collectionData[0][0]);
+
+  for (i = 0; i < key_headers.length; i++) {
+    if (key_headers[i] === "_id") continue;
+    let j;
+    for (j = 0; j < collectionData.length; j++) {
+      if (!collectionData[j][0].hasOwnProperty(key_headers[i])) break;
+    }
+    if (j == collectionData.length) break;
+  }
+  if (i == key_headers.length) {
+    res.send(500, "No matching key found");
+    return;
+  }
+  const matching_key = key_headers[i];
+  console.log("matching_key:", matching_key);
+
+  let joinedData = [];
+
+  for (i = 0; i < collectionData.length; i++) {
+    let j;
+    for (j = 0; j < collectionData[i].length; j++) {
+      const matching_value = collectionData[i][j][matching_key];
+
+      const matching_index = joinedData.findIndex(
+        (e) => e[matching_key] === matching_value
+      );
+      if (matching_index === -1) {
+        joinedData.push(collectionData[i][j]);
+      } else {
+        const old_data = joinedData[matching_index];
+        joinedData[matching_index] = { ...old_data, ...collectionData[i][j] };
+      }
+    }
+  }
+  res.json(joinedData);
+});
+
 router.post("/saveData", async (req, res) => {
   try {
     switch (req.body.db) {

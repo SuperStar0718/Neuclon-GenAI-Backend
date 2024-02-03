@@ -152,7 +152,6 @@ router.post("/deleteConnection", async (req, res) => {
 router.post("/getData", async (req, res) => {
   //find data that has status as connected from mongodb
   const connection = await Connection.findOne({
-    type: req.body.db_type,
     host: req.body.host,
   });
   let collectionData = [];

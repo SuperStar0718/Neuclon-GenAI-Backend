@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const mssql = require("mssql");
 
 const Connection = require("../../models/Connection");
+const Model = require("../../models/Models");
 
 const router = express.Router();
 
@@ -390,6 +391,34 @@ router.post("/getJoinedTableData", async (req, res) => {
   }
   res.json(joinedData);
 });
+
+router.post("/saveModel", async (req, res) => {
+  try {
+    const modelData = req.body;
+    console.log("modelData:", modelData);
+    const newItem = new Model(modelData);
+    newItem.save().then((item) => res.json(item));
+    // const response = await Model.findOneAndReplace({}, modelData, {
+    //   upsert: true,
+    //   new: true,
+    // });
+    // res.json("connection");
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
+});
+
+router.get("/getModels", async (req, res) => {
+  try {
+    const response = await Model.find();
+    res.json(response);
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
+})
+
 
 router.post("/saveData", async (req, res) => {
   try {

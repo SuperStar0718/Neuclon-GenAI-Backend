@@ -392,12 +392,40 @@ router.post("/getJoinedTableData", async (req, res) => {
   res.json(joinedData);
 });
 
+router.post('/deleteModel', async (req, res) => {
+  try {
+    const id = req.body.id;
+    console.log('id:', id)
+    const response =  await Model.findByIdAndDelete(id);
+    console.log('response:', response)
+    res.json(response);
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
+})
+
 router.post("/saveModel", async (req, res) => {
   try {
     const modelData = req.body;
-    console.log("modelData:", modelData);
-    const newItem = new Model(modelData);
-    newItem.save().then((item) => res.json(item));
+    if(modelData._id) {
+      const response = await Model.findOneAndUpdate(
+        { _id: modelData._id },
+        modelData,
+        {
+          upsert: true,
+          new: true,
+          useFindAndModify: false,
+          timestamps:{updatedAt:true}
+        }
+      );
+      res.json(response);
+      return;
+    }else {
+
+      const newItem = new Model(modelData);
+      newItem.save().then((item) => res.json(item));
+    }
     // const response = await Model.findOneAndReplace({}, modelData, {
     //   upsert: true,
     //   new: true,
@@ -412,6 +440,19 @@ router.post("/saveModel", async (req, res) => {
 router.get("/getModels", async (req, res) => {
   try {
     const response = await Model.find();
+    res.json(response);
+  } catch (err) {
+    console.log("error catch", err);
+    res.status(500).json({ message: "Whoops, something went wrong." });
+  }
+})
+
+router.get("/getModel/:id", async (req, res) => {
+  console.log('req.query.id:', req.params.id)
+  try {
+    const id = req.params.id;
+    const response = await Model
+      .findOne({ _id: id });
     res.json(response);
   } catch (err) {
     console.log("error catch", err);

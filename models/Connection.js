@@ -31,10 +31,6 @@ const ConnectionSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  updated_at: {
-    type: Date,
-    default: Date.now,
-  },
-});
+}, { timestamps: true});
 
 module.exports = Connection = mongoose.model("connections", ConnectionSchema);

@@ -15,6 +15,9 @@ const ModelSchema = new mongoose.Schema(
     diagramData: {
       type: String,
     },
+    description:{
+      type:String,
+    }
   },
   { timestamps: true }
 );

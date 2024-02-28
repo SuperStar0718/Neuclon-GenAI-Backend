@@ -13,6 +13,7 @@ class Database {
       case "MasterControl":
       case "FedEx":
       case "ADP":
+      case "Neuclon Edge":
         //if exist dbInfo.uri, use it
         if (dbInfo.uri) {
           // Create a new MongoClient

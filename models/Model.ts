@@ -1,5 +1,17 @@
-const mongoose = require("mongoose");
+import mongoose from 'mongoose';
 
+
+interface IModel {
+  id: number;
+  name: string;
+  host: string;
+  nodeData: string;
+  diagramData: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+
+}
 const ModelSchema = new mongoose.Schema(
   {
     name: {
@@ -22,4 +34,4 @@ const ModelSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = Model = mongoose.model("models", ModelSchema);
+export default mongoose.model<IModel>('models', ModelSchema);

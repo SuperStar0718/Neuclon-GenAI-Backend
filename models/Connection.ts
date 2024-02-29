@@ -1,4 +1,17 @@
-const mongoose = require("mongoose");
+import mongoose from 'mongoose';
+export interface IConnection{
+  id: number;
+  type: string;
+  host: string;
+  port: string;
+  username: string;
+  password: string;
+  uri: string;
+  tables: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const ConnectionSchema = new mongoose.Schema({
   id: {
@@ -33,4 +46,6 @@ const ConnectionSchema = new mongoose.Schema({
   },
 }, { timestamps: true});
 
-module.exports = Connection = mongoose.model("connections", ConnectionSchema);
+ConnectionSchema.index({ updatedAt: 1 }); // 1 for ascending order, -1 for descending order
+
+export default mongoose.model<IConnection>('connections', ConnectionSchema);

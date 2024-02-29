@@ -1,46 +1,40 @@
-const OpenAI = require("openai");
-const express = require("express");
-const fs = require("fs");
-const fs_promises = require("fs").promises;
-const path = require("path");
-const db = require("../../database/database");
-const Connection = require("../../models/Connection");
-const mongoose = require("mongoose");
-const mssql = require("mssql");
-const { Client } = require("pg");
-const { MongoClient } = require("mongodb");
-const createCsvWriter = require("csv-writer").createObjectCsvWriter;
-const moment = require("moment-timezone");
-const router = express.Router();
+import fs from "fs";
+import { promises as fs_promises } from "fs";
+import path from "path";
+import { connectToDatabase } from "../database/database";
+import Connection, { IConnection } from "../models/Connection";
+import mongoose from "mongoose";
+import mssql from "mssql";
+import { Client } from "pg";
+import { MongoClient } from "mongodb";
+import { createObjectCsvWriter as createCsvWriter } from "csv-writer";
+import moment from "moment-timezone";
+import dotenv from "dotenv";
+import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"], // defaults to process.env["OPENAI_API_KEY"]
 });
 
 let messageMap = new Map();
-let thread_id = null;
+let thread_id: any = null;
+const OPENAI_ASSISTANT_ID = process.env["OPENAI_ASSISTANT_ID"] || "";
 
-async function Chat(msg) {
+export async function Chat(msg: string) {
   //upload database file
   const file_id = await uploadFile();
   console.log("file_id:", file_id);
   let myAssistant;
   //modify assistant with this database file
   try {
-    myAssistant = await openai.beta.assistants.update(
-      process.env["OPENAI_ASSISTANT_ID"],
-      {
-        file_ids: file_id,
-      }
-    );
+    myAssistant = await openai.beta.assistants.update(OPENAI_ASSISTANT_ID, {
+      file_ids: file_id,
+    });
   } catch (err) {
     console.log("error:", err);
-    myAssistant = await openai.beta.assistants.retrieve(
-      process.env["OPENAI_ASSISTANT_ID"],
-      {
-        file_ids: ["file-EnnrF8UFZYzCPFPRabG7ag2k"],
-      }
-    );
+    myAssistant = await openai.beta.assistants.update(OPENAI_ASSISTANT_ID, {
+      file_ids: ["file-EnnrF8UFZYzCPFPRabG7ag2k"],
+    });
   }
   console.log("myAssistant:", myAssistant);
   let myThread = null;
@@ -63,12 +57,10 @@ async function Chat(msg) {
   // console.log('run:', run);
 
   await waitOnRun(myThread, run);
-
-  const threadMessages = await openai.beta.threads.messages.list(
-    myThread.id,
-    (order = "asc"),
-    (after = message.id)
-  );
+  const threadMessages = await openai.beta.threads.messages.list(myThread.id, {
+    order: "asc",
+    after: message.id,
+  });
   console.log("threadMessages content:", threadMessages.data[0].content);
   // console.log('threadMessages:', threadMessages);
   let result = "";
@@ -81,17 +73,16 @@ async function Chat(msg) {
       console.log("annotations:", message.text.annotations);
       const annotations = message.text.annotations;
       let messageContent = message.text;
-      let citations = [];
+      let citations: any = [];
       try {
         for (let index = 0; index < annotations.length; index++) {
           if (annotations.length == 0) break;
           let annotation = annotations[index];
           console.log("annotation:", annotation);
           //Replace the text with a footnote
-
-          await openai.files
-            .retrieve(annotation.file_path.file_id)
-            .then((citedFile) => {
+          if ("file_path" in annotation) {
+            const file_id = annotation.file_path.file_id;
+            await openai.files.retrieve(file_id).then((citedFile) => {
               citations.push(
                 `[${index}] Click <here> to download ${citedFile.filename}`
               );
@@ -99,47 +90,44 @@ async function Chat(msg) {
               messageContent.value = messageContent.value.replace(
                 /\[([^[\]]+)\]\(sandbox:\/mnt\/data\/([^)]+)\)/g,
                 "</pre><a href='#' class='" +
-                  annotation.file_path.file_id +
+                  file_id +
                   " " +
                   fileName +
                   "' >$1</a><pre>"
               );
             });
+          }
 
           console.log("messagecontent.value: ", messageContent.value);
 
           // Gather citations based on annotation attributes
-          if (annotation.file_citation) {
+          if ("file_citation" in annotation) {
+            const quote = annotation.file_citation.quote;
             await openai.files
               .retrieve(annotation.file_citation.file_id)
               .then((citedFile) => {
                 citations.push(
-                  `[${index}] ${annotation.file_citation.quote} from ${citedFile.filename}`
+                  `[${index}] ${quote} from ${citedFile.filename}`
                 );
               });
-          } else if (annotation.file_path) {
+          } else if ("file_path" in annotation) {
+            const fild_id = annotation.file_path.file_id;
             await openai.files
               .retrieveContent(annotation.file_path.file_id)
               .then(async (file_content) => {
                 fs.writeFile(
-                  "./download_files/" + annotation.file_path.file_id,
+                  "./download_files/" + fild_id,
                   file_content,
                   { flag: "wx" },
                   (err) => {
                     if (err) {
                       if (err.code === "EEXIST") {
-                        console.error(
-                          "File already exists:",
-                          annotation.file_path.file_id
-                        );
+                        console.error("File already exists:", fild_id);
                       } else {
                         console.error("Error creating the file:", err);
                       }
                     } else {
-                      console.log(
-                        "File created successfully:",
-                        annotation.file_path.file_id
-                      );
+                      console.log("File created successfully:", fild_id);
                     }
                   }
                 );
@@ -172,7 +160,7 @@ async function Chat(msg) {
   return result;
 }
 
-const waitOnRun = async (thread, run) => {
+export const waitOnRun = async (thread: any, run: any) => {
   while (run.status == "queued" || run.status == "in_progress") {
     // Assuming `client.beta.threads.runs.retrieve` is an async function
     run = await openai.beta.threads.runs.retrieve(thread.id, run.id);
@@ -183,7 +171,7 @@ const waitOnRun = async (thread, run) => {
   return run;
 };
 
-async function uploadFile() {
+export async function uploadFile() {
   let file_ids = [];
   try {
     const files = fs.readdirSync("dataFiles");
@@ -208,7 +196,7 @@ async function uploadFile() {
   return file_ids;
 }
 
-async function getAllDataFromDB(selectedDataset) {
+export async function getAllDataFromDB(selectedDataset: any) {
   let data = [];
   selectedDataset = JSON.parse(selectedDataset);
   console.log("selected Dataset", selectedDataset);
@@ -222,18 +210,12 @@ async function getAllDataFromDB(selectedDataset) {
 
     switch (dataset.db_type) {
       case "MongoDB":
-        if (connection.uri) {
-          client = new MongoClient(connection.uri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-          });
+        if (connection?.uri) {
+          client = new MongoClient(connection.uri, {});
         } else {
           client = new MongoClient(
-            `mongodb+srv://${connection.username}:${connection.password}@${connection.host}/${connection.databaseName}`,
-            {
-              useNewUrlParser: true,
-              useUnifiedTopology: true,
-            }
+            `mongodb+srv://${connection?.username}:${connection?.password}@${connection?.host}`,
+            {}
           );
         }
         await client.connect();
@@ -292,11 +274,9 @@ async function getAllDataFromDB(selectedDataset) {
         break;
       case "PostgreSQL":
         client = new Client({
-          user: connection.username,
-          host: connection.host,
-          database: connection.databaseName,
-          password: connection.password,
-          port: parseInt(connection.port),
+          user: connection?.username,
+          host: connection?.host,
+          password: connection?.password,
         });
         await client.connect();
         const res = await client.query("SELECT * FROM public." + dataset.name);
@@ -344,11 +324,9 @@ async function getAllDataFromDB(selectedDataset) {
         break;
       case "mssql":
         client = await mssql.connect({
-          user: connection.username,
-          password: connection.password,
-          server: connection.host,
-          database: connection.databaseName,
-          port: parseInt(connection.port),
+          user: connection?.username,
+          password: connection?.password,
+          server: connection?.host ?? "",
         });
         const result = await client.query`SELECT * FROM TraningData`;
         client.close();
@@ -360,7 +338,7 @@ async function getAllDataFromDB(selectedDataset) {
   return data;
 }
 
-const removeAllFilesInFolder = (dirPath) => {
+export const removeAllFilesInFolder = (dirPath: string) => {
   try {
     const files = fs.readdirSync(dirPath);
 
@@ -380,7 +358,7 @@ const removeAllFilesInFolder = (dirPath) => {
   }
 };
 
-const addCommaEndOfLine = async (dirPath) => {
+export const addCommaEndOfLine = async (dirPath: string) => {
   try {
     const files = fs.readdirSync(dirPath);
 
@@ -401,15 +379,8 @@ const addCommaEndOfLine = async (dirPath) => {
           .join("\n");
 
         // Rewrite the file
-        await fs_promises.writeFile(
-          filePath,
-          modifiedContent,
-          "utf8",
-          (err) => {
-            if (err) throw err;
-            console.log("CSV file has been modified with trailing commas.");
-          }
-        );
+        await fs_promises.writeFile(filePath, modifiedContent, "utf8");
+        console.log("CSV file has been modified with trailing commas.");
         console.log(`Added comma to file: ${filePath}`);
       }
     }
@@ -418,52 +389,30 @@ const addCommaEndOfLine = async (dirPath) => {
   }
 };
 
-// @route  POST chatgpt/generateResponseFromChatGPT
-// @desc   Register user
-// @access Public
-
-router.post("/generateResponseFromChatGPT/", async (req, res) => {
+export const generateResponseFromChatGPT = async (req: any, res: any) => {
   removeAllFilesInFolder("dataFiles");
-  try {
-    const request = req.body;
-    if (!request) {
-      res.status(404).send("Not found");
-      return;
-    }
-    // const list = await openai.files.list();
-
-    // for await (const file of list) {
-    //   console.log(file);
-    //   await openai.files.del(file.id);
-    // }
-
-    if (request.selectedDataset)
-      await getAllDataFromDB(request.selectedDataset);
-    await addCommaEndOfLine("dataFiles");
-
-    console.log("user prompt:", request);
-    if (request.new) thread_id = null;
-    const chatCompletion = await Chat(request.prompt);
-    // console.log("chatCompletion:", chatCompletion);
-    res.json(chatCompletion);
-  } catch (err) {
-    console.log("error catch", err);
-    res.status(500).json({ message: "Whoops, something went wrong." });
+  const request = req.body;
+  if (!request) {
+    res.status(404).send("Not found");
+    return;
   }
-});
 
-// @route post chatgpt/sendMessage
-// @desc send message to openAI
-// @access public
-router.post("/sendMessage", async (req, res) => {
-  const messages = req.body;
+  if (request.selectedDataset) await getAllDataFromDB(request.selectedDataset);
+  await addCommaEndOfLine("dataFiles");
+
+  console.log("user prompt:", request);
+  if (request.new) thread_id = null;
+  const chatCompletion = await Chat(request.prompt);
+  return chatCompletion;
+};
+
+export const sendMessage = async (messages: any) => {
   const id = Date.now().toString(); // Generate a unique id
   messageMap.set(id, messages); // Store the messages object in the map
-  console.log(messageMap);
-  res.json({ id }); // Send the id to the client
-});
+  return id;
+};
 
-router.get("/downloadFile/:id", async (req, res) => {
+export const downloadFile = async (req: any, res: any) => {
   const fileId = req.params.id;
 
   await openai.files.retrieve(fileId).then((citedFile) => {
@@ -483,17 +432,5 @@ router.get("/downloadFile/:id", async (req, res) => {
     } else {
       res.status(404).send("File not found");
     }
-    // Set the headers to suggest a file download with the original file name
-    // res.download(filePath, fileName, (err) => {
-    //     if (err) {
-    //         // Handle error, but don't expose to the client
-    //         console.error(err);
-    //         res.status(500).send(
-    //             "Error occurred while downloading the file."
-    //         );
-    //     }
-    // });
   });
-});
-
-module.exports = router;
+};

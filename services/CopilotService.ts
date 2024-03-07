@@ -1,9 +1,7 @@
 import fs from "fs";
 import { promises as fs_promises } from "fs";
 import path from "path";
-import { connectToDatabase } from "../database/database";
-import Connection, { IConnection } from "../models/Connection";
-import mongoose from "mongoose";
+import Connection from "../models/Connection";
 import mssql from "mssql";
 import { Client } from "pg";
 import { MongoClient } from "mongodb";
@@ -12,6 +10,9 @@ import moment from "moment-timezone";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 
+dotenv.config();
+
+// Create an instance of the OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"], // defaults to process.env["OPENAI_API_KEY"]
 });
@@ -20,10 +21,16 @@ let messageMap = new Map();
 let thread_id: any = null;
 const OPENAI_ASSISTANT_ID = process.env["OPENAI_ASSISTANT_ID"] || "";
 
+/**
+ *
+ *
+ * @export
+ * @param {string} msg
+ * @return {*}
+ */
 export async function Chat(msg: string) {
   //upload database file
   const file_id = await uploadFile();
-  console.log("file_id:", file_id);
   let myAssistant;
   //modify assistant with this database file
   try {
@@ -36,41 +43,32 @@ export async function Chat(msg: string) {
       file_ids: ["file-EnnrF8UFZYzCPFPRabG7ag2k"],
     });
   }
-  console.log("myAssistant:", myAssistant);
   let myThread = null;
   if (thread_id) {
     myThread = await openai.beta.threads.retrieve(thread_id);
-    console.log("myThread:", myThread);
   } else {
     myThread = await openai.beta.threads.create();
     thread_id = myThread.id;
-    console.log("emptyThread:", myThread);
   }
   const message = await openai.beta.threads.messages.create(myThread.id, {
     role: "user",
     content: msg,
   });
-  // console.log('message:', message);
   const run = await openai.beta.threads.runs.create(myThread.id, {
     assistant_id: myAssistant.id,
   });
-  // console.log('run:', run);
 
   await waitOnRun(myThread, run);
   const threadMessages = await openai.beta.threads.messages.list(myThread.id, {
     order: "asc",
     after: message.id,
   });
-  console.log("threadMessages content:", threadMessages.data[0].content);
-  // console.log('threadMessages:', threadMessages);
   let result = "";
   for (let i = 0; i < threadMessages.data[0].content.length; i++) {
     let message = threadMessages.data[0].content[i];
 
     // threadMessages.data[0].content.forEach(async message => {
     if (message.type == "text") {
-      console.log("text message:", message.text.value);
-      console.log("annotations:", message.text.annotations);
       const annotations = message.text.annotations;
       let messageContent = message.text;
       let citations: any = [];
@@ -78,7 +76,6 @@ export async function Chat(msg: string) {
         for (let index = 0; index < annotations.length; index++) {
           if (annotations.length == 0) break;
           let annotation = annotations[index];
-          console.log("annotation:", annotation);
           //Replace the text with a footnote
           if ("file_path" in annotation) {
             const file_id = annotation.file_path.file_id;
@@ -97,8 +94,6 @@ export async function Chat(msg: string) {
               );
             });
           }
-
-          console.log("messagecontent.value: ", messageContent.value);
 
           // Gather citations based on annotation attributes
           if ("file_citation" in annotation) {
@@ -127,7 +122,6 @@ export async function Chat(msg: string) {
                         console.error("Error creating the file:", err);
                       }
                     } else {
-                      console.log("File created successfully:", fild_id);
                     }
                   }
                 );
@@ -139,7 +133,6 @@ export async function Chat(msg: string) {
       } catch (error) {
         console.log("error: ", error);
       }
-      console.log("citations:", citations);
       result += "<pre class='whitespace-pre-wrap'>" + messageContent.value;
       ("</pre>");
     }
@@ -153,32 +146,45 @@ export async function Chat(msg: string) {
 
       // Convert the Buffer to a base64 string
       const base64Image = image_data_buffer.toString("base64");
-      // console.log('base64Image:', base64Image);
       result += "<img src='data:image/jpeg;base64," + base64Image + "'/>";
     }
   }
   return result;
 }
 
-export const waitOnRun = async (thread: any, run: any) => {
+export /**
+ *
+ *
+ * @param {*} thread
+ * @param {*} run
+ * @return {*}
+ */
+const waitOnRun = async (thread: any, run: any) => {
   while (run.status == "queued" || run.status == "in_progress") {
     // Assuming `client.beta.threads.runs.retrieve` is an async function
     run = await openai.beta.threads.runs.retrieve(thread.id, run.id);
     // Sleep for 0.5 seconds
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  // console.log('after wait on run :', run);
   return run;
 };
 
+/**
+ *
+ *
+ * @export
+ * @return {*}
+ */
 export async function uploadFile() {
   let file_ids = [];
+  const dirPath = path.join(process.cwd(), "dataFiles");
+
   try {
-    const files = fs.readdirSync("dataFiles");
+    const files = fs.readdirSync(dirPath);
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       // Use 'path.join' to get the full file path
-      let fullPath = path.join("dataFiles", file);
+      let fullPath = `${dirPath}\\${file}`;
 
       // Check if the path is a file
       if (fs.statSync(fullPath).isFile()) {
@@ -186,7 +192,6 @@ export async function uploadFile() {
           file: fs.createReadStream(fullPath),
           purpose: "assistants",
         });
-        console.log("upload file response:", response);
         file_ids.push(response.id);
       }
     }
@@ -196,10 +201,17 @@ export async function uploadFile() {
   return file_ids;
 }
 
+/**
+ *
+ *
+ * @export
+ * @param {*} selectedDataset
+ * @return {*}
+ */
 export async function getAllDataFromDB(selectedDataset: any) {
   let data = [];
+  const parentDir = path.resolve(__dirname, "..");
   selectedDataset = JSON.parse(selectedDataset);
-  console.log("selected Dataset", selectedDataset);
   for (let i = 0; i < selectedDataset.length; i++) {
     const dataset = selectedDataset[i];
     let client, sampleData, headers, csvWriter;
@@ -207,9 +219,14 @@ export async function getAllDataFromDB(selectedDataset: any) {
       status: "connected",
       type: dataset.db_type,
     });
-
     switch (dataset.db_type) {
       case "MongoDB":
+      case "QuickBooks":
+      case "SAP":
+      case "Tulip":
+      case "MasterControl":
+      case "FedEx":
+      case "ADP":
         if (connection?.uri) {
           client = new MongoClient(connection.uri, {});
         } else {
@@ -220,12 +237,9 @@ export async function getAllDataFromDB(selectedDataset: any) {
         }
         await client.connect();
         const db = client.db(dataset.db_name);
-
         const collection = db.collection(dataset.name);
-
         // Get all collectionData in the current collection
         const collectionData = await collection.find().toArray();
-
         data = collectionData;
         // Format Timestamp field in each document
         data.forEach((doc) => {
@@ -250,7 +264,7 @@ export async function getAllDataFromDB(selectedDataset: any) {
 
         // Configure CSV writer
         csvWriter = createCsvWriter({
-          path: `dataFiles/${dataset.name}.csv`,
+          path: path.join(parentDir, "dataFiles", `${dataset.name}.csv`),
           header: headers,
         });
         // Modify each record
@@ -266,11 +280,11 @@ export async function getAllDataFromDB(selectedDataset: any) {
         });
         // Write data to CSV
         await csvWriter.writeRecords(data);
-        console.log("CSV file written successfully");
         client.close();
-        // }
-        // }
-        // console.log('data:', data)
+        console.log(
+          "CSV file written successfully:",
+          path.join(parentDir, "dataFiles", `${dataset.name}.csv`)
+        );
         break;
       case "PostgreSQL":
         client = new Client({
@@ -280,7 +294,6 @@ export async function getAllDataFromDB(selectedDataset: any) {
         });
         await client.connect();
         const res = await client.query("SELECT * FROM public." + dataset.name);
-        // console.log('res:', res)
         data = res.rows;
         // Format Timestamp field in each document
         data.forEach((doc) => {
@@ -304,7 +317,7 @@ export async function getAllDataFromDB(selectedDataset: any) {
 
         // Configure CSV writer
         csvWriter = createCsvWriter({
-          path: `dataFiles/${dataset.name}.csv`,
+          path: path.join(parentDir, "dataFiles", `${dataset.name}.csv`),
           header: headers,
         });
         // Modify each record
@@ -338,19 +351,22 @@ export async function getAllDataFromDB(selectedDataset: any) {
   return data;
 }
 
-export const removeAllFilesInFolder = (dirPath: string) => {
+export /**
+ *
+ *
+ * @param {string} dirPath
+ */
+const removeAllFilesInFolder = (folderName: string) => {
   try {
+    const dirPath = path.join(process.cwd(), folderName);
     const files = fs.readdirSync(dirPath);
-
     for (const file of files) {
       const filePath = path.join(dirPath, file);
+      console.log("filePath:", filePath);
       const fileStat = fs.statSync(filePath);
 
       if (fileStat.isFile()) {
         fs.unlinkSync(filePath);
-        console.log(`Deleted file: ${filePath}`);
-      } else {
-        console.log(`Skipping non-file: ${filePath}`);
       }
     }
   } catch (err) {
@@ -358,8 +374,15 @@ export const removeAllFilesInFolder = (dirPath: string) => {
   }
 };
 
-export const addCommaEndOfLine = async (dirPath: string) => {
+export /**
+ *
+ *
+ * @param {string} dirPath
+ */
+const addCommaEndOfLine = async (folderName: string) => {
   try {
+    const dirPath = path.join(process.cwd(), folderName);
+
     const files = fs.readdirSync(dirPath);
 
     for (const file of files) {
@@ -380,8 +403,6 @@ export const addCommaEndOfLine = async (dirPath: string) => {
 
         // Rewrite the file
         await fs_promises.writeFile(filePath, modifiedContent, "utf8");
-        console.log("CSV file has been modified with trailing commas.");
-        console.log(`Added comma to file: ${filePath}`);
       }
     }
   } catch (err) {
@@ -389,7 +410,14 @@ export const addCommaEndOfLine = async (dirPath: string) => {
   }
 };
 
-export const generateResponseFromChatGPT = async (req: any, res: any) => {
+export /**
+ *
+ *
+ * @param {*} req
+ * @param {*} res
+ * @return {*}
+ */
+const generateResponseFromChatGPT = async (req: any, res: any) => {
   removeAllFilesInFolder("dataFiles");
   const request = req.body;
   if (!request) {
@@ -400,13 +428,18 @@ export const generateResponseFromChatGPT = async (req: any, res: any) => {
   if (request.selectedDataset) await getAllDataFromDB(request.selectedDataset);
   await addCommaEndOfLine("dataFiles");
 
-  console.log("user prompt:", request);
   if (request.new) thread_id = null;
   const chatCompletion = await Chat(request.prompt);
   return chatCompletion;
 };
 
-export const sendMessage = async (messages: any) => {
+export /**
+ *
+ *
+ * @param {*} messages
+ * @return {*}
+ */
+const sendMessage = async (messages: any) => {
   const id = Date.now().toString(); // Generate a unique id
   messageMap.set(id, messages); // Store the messages object in the map
   return id;
@@ -419,7 +452,6 @@ export const downloadFile = async (req: any, res: any) => {
     const fileName = path.basename(citedFile.filename);
     const filePath = "./download_files/" + fileId;
     if (fs.existsSync(filePath)) {
-      console.log("file exists");
       // Set the appropriate headers for the file download
       res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
       res.setHeader("Content-Type", "application/octet-stream");

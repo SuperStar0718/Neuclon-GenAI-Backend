@@ -1,6 +1,6 @@
 import { MongoClient } from "mongodb";
 import mssql from "mssql";
-const { Client } = require("pg");
+import { Client } from "pg";
 
 export const connectToDatabase = async (dbInfo: any) => {
   switch (dbInfo.type) {
@@ -130,7 +130,6 @@ export const connectToDatabase = async (dbInfo: any) => {
       const DBNamesData = await client.query(
         "SELECT datname FROM pg_database WHERE datistemplate = false;"
       );
-      console.log("all databases:", DBNamesData);
       let tableNames = [];
 
       for (let i = 0; i < DBNamesData.rows.length; i++) {
@@ -157,7 +156,6 @@ export const connectToDatabase = async (dbInfo: any) => {
           collections: tables,
         });
       }
-      console.log("tables:", tableNames);
 
       const connection = {
         type: "postgre",

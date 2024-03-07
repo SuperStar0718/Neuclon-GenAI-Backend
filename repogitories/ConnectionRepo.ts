@@ -4,7 +4,13 @@ import Connection from "../models/Connection";
 
 const { Client } = require("pg");
 
-export const connectToDatabase = async (dbInfo: any) => {
+export /**
+ *
+ *
+ * @param {*} dbInfo : any  // dbInfo is a parameter
+ * @return {*}  // return connected database
+ */
+const connectToDatabase = async (dbInfo: any) => {
   switch (dbInfo.type) {
     case "MongoDB":
     case "QuickBooks":
@@ -20,14 +26,12 @@ export const connectToDatabase = async (dbInfo: any) => {
         await client.connect();
         const url = new URL(dbInfo.uri);
         const databasesList = await client.db().admin().listDatabases();
-        console.log("databaselist:", databasesList);
         const databasesWithCollections = await Promise.all(
           databasesList.databases.map(async (database) => {
             const collectionsData = await client
               .db(database.name)
               .listCollections()
               .toArray();
-            console.log("connection data:", database.name, collectionsData);
             const collections = await Promise.all(
               collectionsData.map(async (collection) => {
                 const doc = await client
@@ -35,7 +39,6 @@ export const connectToDatabase = async (dbInfo: any) => {
                   .collection(collection.name)
                   .findOne();
                 const headers = doc ? Object.keys(doc) : [];
-                console.log("headers:", headers);
                 return {
                   collectionName: collection.name,
                   headers: headers.join(", "),
@@ -65,7 +68,6 @@ export const connectToDatabase = async (dbInfo: any) => {
         );
         await client.connect();
         const databasesList = await client.db().admin().listDatabases();
-        console.log("databaselist:", databasesList);
         const databasesWithCollections = await Promise.all(
           databasesList.databases.map(async (database) => {
             const collectionsData = await client
@@ -90,8 +92,6 @@ export const connectToDatabase = async (dbInfo: any) => {
             };
           })
         );
-
-        console.log(databasesWithCollections);
         client.close();
 
         return {
@@ -132,7 +132,6 @@ export const connectToDatabase = async (dbInfo: any) => {
       const DBNamesData = await client.query(
         "SELECT datname FROM pg_database WHERE datistemplate = false;"
       );
-      console.log("all databases:", DBNamesData);
       let tableNames = [];
 
       for (let i = 0; i < DBNamesData.rows.length; i++) {
@@ -175,7 +174,13 @@ export const connectToDatabase = async (dbInfo: any) => {
   }
 };
 
-export const establishConnection = async (connection: any) => {
+export /**
+ *
+ *
+ * @param {*} connection
+ * @return {*}  //add or update connection
+ */
+const establishConnection = async (connection: any) => {
   const response = await Connection.findOneAndReplace(
     { type: connection?.type, host: connection?.host },
     connection,
@@ -187,7 +192,13 @@ export const establishConnection = async (connection: any) => {
   return response;
 };
 
-export const connectTables = async (connection: any) => {
+export /**
+ *
+ *
+ * @param {*} connection
+ * @return {*}  //add or update table of connection
+ */
+const connectTables = async (connection: any) => {
   await Connection.findOneAndUpdate(
     { type: connection.type, host: connection.host },
     { $set: connection },
@@ -197,7 +208,12 @@ export const connectTables = async (connection: any) => {
   );
 };
 
-export const getAllConnections = async () => {
+export /**
+ *
+ *
+ * @return {*} //get all connections
+ */
+const getAllConnections = async () => {
   const connections = await Connection.find().sort({ updatedAt: -1 });
   return connections;
 };

@@ -1,16 +1,10 @@
-import Connection from "../../models/Connection";
-import { Router, Request, Response } from "express";
-import sql from "mssql";
-import { Client } from "pg";
-import { MongoClient, ObjectId } from "mongodb";
+import { Router } from "express";
 import {
   connectTables,
   connectToDatabase,
   establishConnection,
   getAllConnections,
 } from "../../repogitories/ConnectionRepo";
-import Model from "../../models/Model";
-import { ICollection, ITable } from "../../types";
 import {
   deleteConnection,
   deleteData,
@@ -29,10 +23,11 @@ import {
 } from "../../repogitories/ModelRepo";
 
 const Connect = Router();
-
-// @route  POST api/users
-// @desc   Register user
-// @access Public
+/*
+ * @route  POST connect
+ * @desc   check validation for database connnection info and get all tables and store in database
+ * @access Public
+ */
 Connect.post("/connect", async (req, res) => {
   try {
     const connection = await connectToDatabase(req.body);
@@ -44,6 +39,11 @@ Connect.post("/connect", async (req, res) => {
   }
 });
 
+/*
+ * @route  POST connectTables
+ * @desc   add or update table of connection
+ * @access Public
+ */
 Connect.post("/connectTables", async (req, res) => {
   try {
     const connection = req.body;
@@ -55,6 +55,11 @@ Connect.post("/connectTables", async (req, res) => {
   }
 });
 
+/*
+ * @route  GET getAllConnections
+ * @desc   get all connections
+ * @access Public
+ */
 Connect.get("/getAllConnections", async (req, res) => {
   try {
     const connections = await getAllConnections();
@@ -64,10 +69,13 @@ Connect.get("/getAllConnections", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST refreshConnection
+ * @desc   refresh connection
+ * @access Public
+ */
 Connect.post("/refreshConnection", async (req, res) => {
   try {
-    console.log("req.body in refresh", req.body);
     const connection = await refreshConnection(
       req.body.type,
       req.body.host,
@@ -80,10 +88,13 @@ Connect.post("/refreshConnection", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST stopConnection
+ * @desc   stop connection
+ * @access Public
+ */
 Connect.post("/stopConnection", async (req, res) => {
   try {
-    console.log("req.body", req.body);
     const connection = await stopConnection(
       req.body.type,
       req.body.host,
@@ -96,7 +107,11 @@ Connect.post("/stopConnection", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST deleteConnection
+ * @desc   delete connection
+ * @access Public
+ */
 Connect.post("/deleteConnection", async (req, res) => {
   try {
     const connection = await deleteConnection(
@@ -110,7 +125,11 @@ Connect.post("/deleteConnection", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST getData
+ * @desc   get data from database
+ * @access Public
+ */
 Connect.post("/getData", async (req, res) => {
   try {
     await getData(req, res);
@@ -118,7 +137,11 @@ Connect.post("/getData", async (req, res) => {
     console.log("error catch", err);
   }
 });
-
+/*
+ * @route  POST getJoinedTableData
+ * @desc   get joined table data
+ * @access Public
+ */
 Connect.post("/getJoinedTableData", async (req, res) => {
   try {
     const joinedData = await getJoinedTableData(req);
@@ -128,7 +151,11 @@ Connect.post("/getJoinedTableData", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST deleteModel
+ * @desc   delete model
+ * @access Public
+ */
 Connect.post("/deleteModel", async (req, res) => {
   try {
     const id = req.body.id;
@@ -139,7 +166,11 @@ Connect.post("/deleteModel", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST saveModel
+ * @desc   save model
+ * @access Public
+ */
 Connect.post("/saveModel", async (req, res) => {
   try {
     const modelData = req.body;
@@ -150,7 +181,11 @@ Connect.post("/saveModel", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  GET getModels
+ * @desc   get all models
+ * @access Public
+ */
 Connect.get("/getModels", async (req, res) => {
   try {
     const response = await getModels();
@@ -160,7 +195,11 @@ Connect.get("/getModels", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  GET getModel
+ * @desc   get model by id
+ * @access Public
+ */
 Connect.get("/getModel/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -171,7 +210,11 @@ Connect.get("/getModel/:id", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST saveData
+ * @desc   save data
+ * @access Public
+ */
 Connect.post("/saveData", async (req, res) => {
   try {
     await saveData(req, res);
@@ -180,7 +223,11 @@ Connect.post("/saveData", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  POST deleteData
+ * @desc   delete data
+ * @access Public
+ */
 Connect.post("/deleteData", async (req, res) => {
   try {
     await deleteData(req, res);
@@ -189,11 +236,14 @@ Connect.post("/deleteData", async (req, res) => {
     res.status(500).json({ message: "Whoops, something went wrong." });
   }
 });
-
+/*
+ * @route  GET getDatabaseList
+ * @desc   get database list
+ * @access Public
+ */
 Connect.get("/getDatabaseList", async (req, res) => {
   try {
     const jsonData = await getDatabaseList();
-    console.log("jsonData:", jsonData);
     res.json(jsonData);
   } catch (err) {
     console.log("error catch", err);

@@ -1,13 +1,19 @@
 import { MongoClient, ObjectId } from "mongodb";
-import mssql from "mssql";
 import Connection from "../models/Connection";
 import { ICollection, ITable } from "../types";
-import { Router, Request, Response } from "express";
+import { Request, Response } from "express";
 import { Client } from "pg";
 import sql from "mssql";
-import Model from "../models/Model";
 
-export const refreshConnection = async (
+export /**
+ *
+ *
+ * @param {string} type
+ * @param {string} host
+ * @param {string} collectionName
+ * @return {*}
+ */
+const refreshConnection = async (
   type: string,
   host: string,
   collectionName: string
@@ -36,7 +42,15 @@ export const refreshConnection = async (
   return connection;
 };
 
-export const stopConnection = async (
+export /**
+ *
+ *
+ * @param {string} type
+ * @param {string} host
+ * @param {string} collectionName
+ * @return {*}
+ */
+const stopConnection = async (
   type: string,
   host: string,
   collectionName: string
@@ -63,7 +77,15 @@ export const stopConnection = async (
   return connection;
 };
 
-export const deleteConnection = async (
+export /**
+ *
+ *
+ * @param {string} type
+ * @param {string} host
+ * @param {string} collectionName
+ * @return {*}
+ */
+const deleteConnection = async (
   type: string,
   host: string,
   collectionName: string
@@ -92,14 +114,19 @@ export const deleteConnection = async (
   return connection;
 };
 
-export const getData = async (req: Request, res: Response) => {
+export /**
+ *
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
+const getData = async (req: Request, res: Response) => {
   //find data that has status as connected from mongodb
   const connection = await Connection.findOne({
     host: req.body.host,
   });
   let collectionData = [];
   let client: any = null;
-  console.log("connection:", connection);
   switch (connection?.type) {
     case "MongoDB":
     case "QuickBooks":
@@ -137,7 +164,6 @@ export const getData = async (req: Request, res: Response) => {
       client
         .connect()
         .then(() => {
-          // console.log("Connected to the PostgreSQL database");
 
           // Query the specific table in the database
           const query = `SELECT * FROM public."${req.body.name}"`;
@@ -146,10 +172,6 @@ export const getData = async (req: Request, res: Response) => {
         .then((result: any) => {
           // Retrieve the data from the query result
           const data = result.rows;
-          // console.log("Retrieved data:", data);
-
-          // Perform any further operations with the data
-
           // Disconnect from the PostgreSQL database
           client.end();
           res.json(data);
@@ -179,7 +201,13 @@ export const getData = async (req: Request, res: Response) => {
   }
 };
 
-export const getJoinedTableData = async (req: Request) => {
+export /**
+ *
+ *
+ * @param {Request} req
+ * @return {*}
+ */
+const getJoinedTableData = async (req: Request) => {
   const connectedNodes = req.body;
   let collectionData = [];
   let i: number;
@@ -188,7 +216,6 @@ export const getJoinedTableData = async (req: Request) => {
     const connection = await Connection.findOne({
       host: node.host,
     });
-    // console.log("connection:", connection);
     let client: any = null;
     try {
       switch (connection?.type) {
@@ -215,7 +242,6 @@ export const getJoinedTableData = async (req: Request) => {
           collectionData[i] = await collection
             .find({}, { projection: { _id: 0 } })
             .toArray();
-          // console.log("collectionData :", collectionData[i]);
           await client.close();
           break;
         case "postgre":
@@ -231,8 +257,6 @@ export const getJoinedTableData = async (req: Request) => {
           client
             .connect()
             .then(() => {
-              // console.log("Connected to the PostgreSQL database");
-
               // Query the specific table in the database
               const query = `SELECT * FROM public."${node.description}"`;
               return client.query(query);
@@ -240,10 +264,6 @@ export const getJoinedTableData = async (req: Request) => {
             .then(async (result: any) => {
               // Retrieve the data from the query result
               const data = result.rows;
-              // console.log("Retrieved data:", data);
-
-              // Perform any further operations with the data
-
               // Disconnect from the PostgreSQL database
               client.end();
               collectionData[i] = await collection.find().toArray();
@@ -294,7 +314,6 @@ export const getJoinedTableData = async (req: Request) => {
     throw new Error("No matching key found");
   }
   const matching_key = key_headers[i];
-  console.log("matching_key:", matching_key);
 
   let joinedData = [];
 
@@ -317,7 +336,13 @@ export const getJoinedTableData = async (req: Request) => {
   return joinedData;
 };
 
-export const saveData = async (req: Request, res: Response) => {
+export /**
+ *
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
+const saveData = async (req: Request, res: Response) => {
   switch (req.body.db) {
     case "MongoDB":
       //find data that has status as connected and type is mongodb
@@ -340,7 +365,6 @@ export const saveData = async (req: Request, res: Response) => {
       await client.connect();
       const db = client.db("GenAI");
       const collection = db.collection("GenAI");
-      console.log("connection:", connection);
       // Ensure that _id is converted to ObjectId
       const documentId = new ObjectId(req.body.data._id);
       // Define the update operation, excluding _id from the update
@@ -349,12 +373,17 @@ export const saveData = async (req: Request, res: Response) => {
       const update = { $set: updateData };
       const result = await collection.updateOne({ _id: documentId }, update);
       client.close();
-      console.log("1 document updated:", result);
       res.json(result);
   }
 };
 
-export const deleteData = async (req: Request, res: Response) => {
+export /**
+ *
+ *
+ * @param {Request} req
+ * @param {Response} res
+ */
+const deleteData = async (req: Request, res: Response) => {
   switch (req.body.db) {
     case "MongoDB":
       //find data that has status as connected and type is mongodb
@@ -377,26 +406,23 @@ export const deleteData = async (req: Request, res: Response) => {
       await client.connect();
       const db = client.db("GenAI");
       const collection = db.collection("GenAI");
-      console.log("connection:", connection);
       // Ensure that _id is converted to ObjectId
       const documentId = new ObjectId(req.body.data._id);
       const result = await collection.deleteOne({ _id: documentId });
       client.close();
-      console.log("1 document deleted:", result);
       res.json(result);
   }
 };
 
-export const getDatabaseList = async () => {
+export /**
+ *
+ *
+ * @return {*} 
+ */
+ const getDatabaseList = async () => {
   //find data that has status as connected from mongodb
   const connections = await Connection.find();
-  let data = [];
-  let mongodb_databases,
-    mongodb_collectionsPerDatabase = [],
-    postgres_databases,
-    postgres_collectionsPerDatabase = [],
-    mssql_databases,
-    mssql_collectionsPerDatabase;
+  
   let jsonData = [];
   let index = 0;
 

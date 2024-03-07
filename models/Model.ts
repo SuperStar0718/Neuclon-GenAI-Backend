@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+import mongoose from "mongoose";
 
 interface IModel {
   id: number;
@@ -10,7 +9,6 @@ interface IModel {
   description: string;
   createdAt: Date;
   updatedAt: Date;
-
 }
 const ModelSchema = new mongoose.Schema(
   {
@@ -27,11 +25,11 @@ const ModelSchema = new mongoose.Schema(
     diagramData: {
       type: String,
     },
-    description:{
-      type:String,
-    }
+    description: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IModel>('models', ModelSchema);
+export default mongoose.model<IModel>("models", ModelSchema);

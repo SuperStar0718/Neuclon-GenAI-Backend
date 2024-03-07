@@ -7,18 +7,16 @@ import {
 } from "../../services/CopilotService";
 
 dotenv.config();
-
 const Copilot = Router();
 
-// @route  POST chatgpt/generateResponseFromChatGPT
-// @desc   Register user
-// @access Public
-
+/*
+ * @route  POST copilot/generateResponseFromChatGPT
+ * @desc   generate response from chatGPT
+ * @access Public
+ */
 Copilot.post("/generateResponseFromChatGPT/", async (req, res) => {
   try {
     const chatCompletion = await generateResponseFromChatGPT(req, res);
-
-    // console.log("chatCompletion:", chatCompletion);
     res.json(chatCompletion);
   } catch (err) {
     console.log("error catch", err);
@@ -26,9 +24,11 @@ Copilot.post("/generateResponseFromChatGPT/", async (req, res) => {
   }
 });
 
-// @route post chatgpt/sendMessage
-// @desc send message to openAI
-// @access public
+/*
+ * @route  POST copilot/sendMessage
+ * @desc   send message
+ * @access Public
+ */
 Copilot.post("/sendMessage", async (req, res) => {
   try {
     const messages = req.body;
@@ -40,10 +40,11 @@ Copilot.post("/sendMessage", async (req, res) => {
   }
 });
 
-// @route get chatgpt/downloadFile/:id
-// @desc download file
-// @access public
-
+/*
+ * @route  GET copilot/downloadFile
+ * @desc   download file
+ * @access Public
+ */
 Copilot.get("/downloadFile/:id", async (req, res) => {
   try {
     await downloadFile(req, res);
